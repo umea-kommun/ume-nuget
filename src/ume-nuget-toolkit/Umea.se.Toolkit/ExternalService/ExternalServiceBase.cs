@@ -70,6 +70,11 @@ public abstract class ExternalServiceBase
 
         return await EnsureSuccessAndReadBody<T>(response);
     }
+    protected async Task<T> HttpPostContent<T>(string requestUrl, HttpContent content, IReadOnlyDictionary<string, string>? headers = null)
+    {
+        HttpResponseMessage response = await SendHttpRequest(HttpMethod.Post, requestUrl, content, headers);
+        return await EnsureSuccessAndReadBody<T>(response);
+    }
 
     protected async Task<T> HttpPut<T>(string requestUrl, object? requestBody = null, IReadOnlyDictionary<string, string>? headers = null)
     {
@@ -103,7 +108,11 @@ public abstract class ExternalServiceBase
             RequestUri = new Uri(endpoint, UriKind.RelativeOrAbsolute),
         };
 
-        if (requestBody is not null)
+        if (requestBody is HttpContent httpContent)
+        {
+            request.Content = httpContent;
+        }
+        else if (requestBody is not null)
         {
             string json = JsonSerializer.Serialize(requestBody, SerializerOptions);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
