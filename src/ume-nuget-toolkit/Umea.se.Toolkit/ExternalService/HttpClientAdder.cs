@@ -13,6 +13,15 @@ internal static class HttpClientAdder
         HttpClientOptions options = new();
         configureOptions?.Invoke(options);
 
+        // Eager-load the client cert at registration time so we only write one
+        // key file to the machine key store per process, instead of one per
+        // HttpMessageHandler rotation. Skip when Key Vault isn't connected
+        // (e.g. unit tests with SuppressKeyVaultConfigs = true) — tests mock
+        // the HttpClient so the handler factory is never invoked anyway.
+        X509Certificate2? clientCertificate = options.CertificateName is not null && KeyVaultService.IsConnected
+            ? KeyVaultService.GetCertificate(options.CertificateName)
+            : null;
+
         services
             .AddHttpClient(clientName)
             .ConfigureHttpClient(httpClient =>
@@ -46,13 +55,11 @@ internal static class HttpClientAdder
             {
                 HttpClientHandler handler = new();
 
-                if (options.CertificateName is not null)
+                if (clientCertificate is not null)
                 {
-                    X509Certificate2 certificate = KeyVaultService.GetCertificate(options.CertificateName);
-
                     handler.SslProtocols = SslProtocols.Tls12;
                     handler.ClientCertificateOptions = ClientCertificateOption.Manual;
-                    handler.ClientCertificates.Add(certificate);
+                    handler.ClientCertificates.Add(clientCertificate);
                 }
 
                 return handler;

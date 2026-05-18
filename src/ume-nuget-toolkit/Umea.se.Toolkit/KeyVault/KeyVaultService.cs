@@ -10,6 +10,8 @@ internal static class KeyVaultService
     private static SecretClient? _secretClient;
     private static SecretClient SecretClient => _secretClient ?? throw new KeyVaultConnectionException($"Key Vault is not connected! Please call {nameof(KeyVaultService)}.{nameof(ConnectToKeyVault)} first.");
 
+    internal static bool IsConnected => _secretClient is not null;
+
     internal static void ConnectToKeyVault(string keyVaultUrl)
     {
         DefaultAzureCredential credential = GetDefaultAzureCredential();
@@ -26,7 +28,10 @@ internal static class KeyVaultService
     {
         string base64Pfx = GetSecret(certificateName);
         byte[] pfxBytes = Convert.FromBase64String(base64Pfx);
-        X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12(pfxBytes, string.Empty, X509KeyStorageFlags.MachineKeySet);
+        X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12(
+            pfxBytes,
+            string.Empty,
+            X509KeyStorageFlags.MachineKeySet);
 
         return certificate;
     }
