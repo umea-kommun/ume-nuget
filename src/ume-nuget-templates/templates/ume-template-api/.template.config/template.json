@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Team Turkos, Umeå kommun",
+  "classifications": [
+    "Web",
+    "API",
+    "ASP.NET",
+    "Turkos"
+  ],
+  "identity": "Umea.se.Templates.API",
+  "groupIdentity": "Umea.se.Templates",
+  "name": "Turkos Backend API",
+  "shortName": "ume-template-api",
+  "description": "An ASP.NET Core API service following Team Turkos conventions, with Umea.se.Toolkit integration and xUnit tests. Supports full layered architecture or minimal setup, cloud (Azure Key Vault, Application Insights) or on-premises deployment, and optional EF Core database integration.",
+  "sourceName": "TemplateService",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "size": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Template size determining the number of projects and layers.",
+      "defaultValue": "Default",
+      "displayName": "API size",
+      "choices": [
+        {
+          "choice": "Default",
+          "description": "Full layered architecture (API, Logic, ServiceAccess, Shared, Tests)"
+        },
+        {
+          "choice": "Small",
+          "description": "Minimal setup with fewer projects"
+        }
+      ]
+    },
+    "api-type": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Application type determining base configuration and infrastructure dependencies.",
+      "defaultValue": "Cloud",
+      "displayName": "API type",
+      "choices": [
+        {
+          "choice": "Cloud",
+          "description": "Azure cloud with Key Vault and Application Insights"
+        },
+        {
+          "choice": "OnPrem",
+          "description": "On-premises without Azure cloud dependencies"
+        }
+      ]
+    },
+    "database-name": {
+      "type": "parameter",
+      "datatype": "string",
+      "description": "Database name. Includes a Database project with EF Core and SQL Server.",
+      "defaultValue": "",
+      "displayName": "Database name",
+      "replaces": "TemplateVarDatabaseName",
+      "fileRename": "TemplateVarDatabaseName"
+    },
+    "isDefault": {
+      "type": "computed",
+      "value": "(size == \"Default\")"
+    },
+    "isSmall": {
+      "type": "computed",
+      "value": "(size == \"Small\")"
+    },
+    "isCloud": {
+      "type": "computed",
+      "value": "(api-type == \"Cloud\")"
+    },
+    "isOnPrem": {
+      "type": "computed",
+      "value": "(api-type == \"OnPrem\")"
+    },
+    "hasDatabase": {
+      "type": "computed",
+      "value": "(database-name != \"\")"
+    },
+    "httpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": {
+        "low": 10000,
+        "high": 65535
+      },
+      "replaces": "TemplateVarHttpsPort"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.idea/**",
+            "**/*.DotSettings.user",
+            "validate-package.ps1"
+          ]
+        },
+        {
+          "condition": "(isSmall)",
+          "exclude": [
+            "Umea.se.TemplateService.API/Mappers/**",
+            "Umea.se.TemplateService.Logic/**",
+            "Umea.se.TemplateService.ServiceAccess/**",
+            "Umea.se.TemplateService.Shared/**"
+          ]
+        },
+        {
+          "condition": "(isOnPrem)",
+          "exclude": [
+            "**/appsettings.dev.json",
+            "**/appsettings.test.json",
+            "**/appsettings.prod.json",
+            ".pipeline-snippets/**"
+          ]
+        },
+        {
+          "condition": "(!hasDatabase)",
+          "exclude": [
+            "Umea.se.TemplateService.Database/**"
+          ]
+        }
+      ]
+    },
+    {
+      "condition": "(isSmall)",
+      "source": "Umea.se.TemplateService.Shared/Infrastructure/",
+      "target": "Umea.se.TemplateService.API/Infrastructure/",
+      "include": [
+        "ApplicationConfig.cs"
+      ]
+    }
+  ]
+}

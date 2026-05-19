@@ -12,7 +12,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v260309T1549-16808
+      ref: refs/tags/release/v260518T0957-17963
 
 parameters:
   - name: environment
@@ -38,6 +38,7 @@ stages:
           paths:
             - src/ume-nuget-toolkit
             - src/ume-nuget-testtoolkit
+            - src/ume-nuget-templates
 
   # ume-nuget-toolkit
   - stage: BuildToolkitStage
@@ -83,5 +84,28 @@ stages:
           entrypointProjectName: Umea.se.TestToolkit
           isStableRelease: true
           shouldTest: false
+          shouldPublish: false
+  # ------
+
+  # ume-nuget-templates
+  - stage: BuildTemplatesStage
+    displayName: Build Templates
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        contains(variables['changedPaths'], 'ume-nuget-templates')
+      )
+    jobs:
+      - template: pipelines/nuget/template-pack-nuget-template.yml@templates
+        parameters:
+          templateRepoAlias: templates
+          packagePath: src/ume-nuget-templates
+          packageName: Templates
+          projectFolderName: ume-nuget-templates
+          entrypointProjectName: Umea.se.Templates
+          isStableRelease: true
           shouldPublish: false
   # ------

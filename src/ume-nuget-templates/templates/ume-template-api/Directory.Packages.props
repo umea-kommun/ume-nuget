@@ -1,0 +1,19 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageVersion Include="Umea.se.Toolkit" Version="2026.5.7.10" />
+        <PackageVersion Include="Umea.se.TestToolkit" Version="2026.3.9.1" />
+        <PackageVersion Include="coverlet.collector" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+        <PackageVersion Include="xunit" Version="2.9.3" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!--#if (hasDatabase) -->
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
+    <!--#endif -->
+    </ItemGroup>
+</Project>

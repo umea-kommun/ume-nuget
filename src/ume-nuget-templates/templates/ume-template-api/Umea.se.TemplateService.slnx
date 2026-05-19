@@ -1,0 +1,12 @@
+<Solution>
+    <Project Path="Umea.se.TemplateService.API\Umea.se.TemplateService.API.csproj" />
+<!--#if (hasDatabase) -->
+    <Project Path="Umea.se.TemplateService.Database\Umea.se.TemplateService.Database.csproj" />
+<!--#endif -->
+<!--#if (isDefault) -->
+    <Project Path="Umea.se.TemplateService.Logic\Umea.se.TemplateService.Logic.csproj" />
+    <Project Path="Umea.se.TemplateService.Shared\Umea.se.TemplateService.Shared.csproj" />
+    <Project Path="Umea.se.TemplateService.ServiceAccess\Umea.se.TemplateService.ServiceAccess.csproj" />
+<!--#endif -->
+    <Project Path="Umea.se.TemplateService.Tests\Umea.se.TemplateService.Tests.csproj" />
+</Solution>

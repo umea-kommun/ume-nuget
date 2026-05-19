@@ -13,7 +13,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v260309T1549-16808
+      ref: refs/tags/release/v260518T0957-17963
 
 parameters:
   - name: packages
@@ -22,6 +22,7 @@ parameters:
     default:
       - Toolkit
       - TestToolkit
+      - Templates
 
 variables:
   - name: environment

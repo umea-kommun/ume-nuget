@@ -1,0 +1,30 @@
+# ============================================================
+# Pipeline snippet for TemplateService
+# Copy the relevant sections below into your release-validation.yml
+# Search for "TODO" to find values that need to be set manually
+# ============================================================
+
+# --- Add to 'CheckForChangesStage' paths ---
+
+            - src/ume-app-templateservice
+
+# --- Add to 'stages' section ---
+
+  # ume-app-templateservice
+  - stage: BuildTemplateServiceStage
+    displayName: Build TemplateService
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        contains(variables['changedPaths'], 'ume-app-templateservice')
+      )
+    jobs:
+      - template: pipelines/azure/template-build-backend.yml@templates
+        parameters:
+          projectFolderName: ume-app-templateservice
+          entrypointProjectName: Umea.se.TemplateService.API
+          shouldPublish: false
+  # ------

@@ -10,7 +10,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v260309T1549-16808
+      ref: refs/tags/release/v260518T0957-17963
 
 parameters:
   - name: publishToolkit
@@ -20,6 +20,11 @@ parameters:
 
   - name: publishTestToolkit
     displayName: Publish ume-nuget-testtoolkit
+    type: boolean
+    default: false
+
+  - name: publishTemplates
+    displayName: Publish ume-nuget-templates
     type: boolean
     default: false
 
@@ -69,6 +74,7 @@ stages:
           paths:
             - src/ume-nuget-toolkit
             - src/ume-nuget-testtoolkit
+            - src/ume-nuget-templates
 
   # ume-nuget-toolkit
   - stage: PackToolkitStage
@@ -164,6 +170,55 @@ stages:
           templateRepoAlias: templates
           isStableRelease: ${{ variables.isStableRelease }}
           projectFolderName: ume-nuget-testtoolkit
+          azureArtifactsFeedName: turkos.umea.se
+          nugetApiKey: $(nuget-api-key)
+          packageVersionTag: $(packageVersionTag)
+  # ------
+
+  # ume-nuget-templates
+  - stage: PackTemplatesStage
+    displayName: Pack Templates
+    dependsOn:
+      - CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.publishTemplates }}, true),
+          and(
+            contains(variables['changedPaths'], 'ume-nuget-templates'),
+            or(
+              eq(variables['Build.Reason'], 'IndividualCI'),
+              eq(variables['isAutomatedDeployment'], true)
+            )
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/nuget/template-pack-nuget-template.yml@templates
+        parameters:
+          templateRepoAlias: templates
+          packagePath: src/ume-nuget-templates
+          packageName: Templates
+          projectFolderName: ume-nuget-templates
+          entrypointProjectName: Umea.se.Templates
+          isStableRelease: ${{ variables.isStableRelease }}
+
+  - stage: PublishTemplatesStage
+    displayName: Publish Templates
+    dependsOn:
+      - PackTemplatesStage
+    variables:
+      packageVersionTag: $[ stageDependencies.PackTemplatesStage.GeneratePackageVersionJob.outputs['Task.TEMPLATES_PACKAGE_VERSION_TAG'] ]
+    condition: eq(dependencies.PackTemplatesStage.result, 'Succeeded')
+    jobs:
+      - template: pipelines/nuget/template-publish-nuget.yml@templates
+        parameters:
+          templateRepoAlias: templates
+          isStableRelease: ${{ variables.isStableRelease }}
+          projectFolderName: ume-nuget-templates
           azureArtifactsFeedName: turkos.umea.se
           nugetApiKey: $(nuget-api-key)
           packageVersionTag: $(packageVersionTag)

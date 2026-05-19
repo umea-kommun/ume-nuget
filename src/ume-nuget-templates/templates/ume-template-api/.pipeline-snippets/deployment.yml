@@ -1,0 +1,116 @@
+# ============================================================
+# Pipeline snippet for TemplateService
+# Copy the relevant sections below into your deployment.yml
+# Search for "TODO" to find values that need to be set manually
+# ============================================================
+
+# --- Add to 'parameters' section ---
+
+#if (hasDatabase)
+  - name: updateTemplateServiceDatabaseJobPicker
+    displayName: Update ume-sqldb-templateservice # TODO: Verify database resource name
+    type: boolean
+    default: false
+
+#endif
+  - name: buildAndDeployTemplateServiceJobPicker
+    displayName: Deploy ume-app-templateservice
+    type: boolean
+    default: false
+
+# --- Add to 'CheckForChangesStage' paths ---
+
+#if (hasDatabase)
+            - src/ume-app-templateservice/Umea.se.TemplateService.Database/Migrations
+#endif
+            - src/ume-app-templateservice
+
+# --- Add to 'stages' section ---
+
+#if (hasDatabase)
+  # ume-sqldb-templateservice # TODO: Verify database resource name
+  - stage: UpdateTemplateServiceDatabaseStage
+    displayName: Update TemplateService Database
+    dependsOn: CheckForChangesStage
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.updateTemplateServiceDatabaseJobPicker }}, true),
+          and(
+            eq('${{ parameters.shouldAutoDeployJobPicker }}', 'true'),
+            contains(variables['changedPaths'], 'Umea.se.TemplateService.Database/Migrations')
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-update-database.yml@templates
+        parameters:
+          environment: ${{ parameters.environment }}
+          azureSubscription: $(serviceConnection)
+          projectFolderName: ume-app-templateservice
+          startupProjectName: Umea.se.TemplateService.API
+          databaseProjectName: Umea.se.TemplateService.Database
+  # ------
+
+#endif
+  # ume-app-templateservice
+  - stage: BuildTemplateServiceStage
+    displayName: Build TemplateService
+    dependsOn:
+      - CheckForChangesStage
+#if (hasDatabase)
+      - UpdateTemplateServiceDatabaseStage
+#endif
+    variables:
+      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        or(
+          eq(${{ parameters.buildAndDeployTemplateServiceJobPicker }}, true),
+          and(
+            eq('${{ parameters.shouldAutoDeployJobPicker }}', 'true'),
+            contains(variables['changedPaths'], 'ume-app-templateservice')
+          )
+        )
+      )
+    jobs:
+      - template: pipelines/azure/template-build-backend.yml@templates
+        parameters:
+          projectFolderName: ume-app-templateservice
+          entrypointProjectName: Umea.se.TemplateService.API
+
+  - stage: DeployTemplateServiceStage
+    displayName: Deploy TemplateService
+    dependsOn: BuildTemplateServiceStage
+#if (hasDatabase)
+    condition: >-
+      and(
+        succeeded('BuildTemplateServiceStage'),
+        or(
+          eq(dependencies.UpdateTemplateServiceDatabaseStage.result, 'Succeeded'),
+          eq(dependencies.UpdateTemplateServiceDatabaseStage.result, 'Skipped')
+        )
+      )
+#else
+    condition: >-
+      and(
+        not(or(failed(), canceled())),
+        succeeded('BuildTemplateServiceStage')
+      )
+#endif
+    jobs:
+      - template: pipelines/azure/template-deploy-backend.yml@templates
+        parameters:
+          azureSubscription: $(serviceConnection)
+          environment: ${{ parameters.environment }}
+          resourceGroup: TODO-RESOURCE-GROUP-${{ parameters.environment }} # TODO: Set resource group name
+          appName: ume-app-templateservice-${{ parameters.environment }}
+          projectFolderName: ume-app-templateservice
+          pingEndpoints:
+            - /index.html
+            - /api/v1.0/home/ping
+  # ------
