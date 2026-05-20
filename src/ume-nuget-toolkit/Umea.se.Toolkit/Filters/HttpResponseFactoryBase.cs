@@ -37,6 +37,9 @@ public class HttpResponseFactoryBase
     public static HttpResponseException Conflict(string? message = null)
         => CreateConflictResponse(new ResponseBody(message));
 
+    public static HttpResponseException Gone(string? message = null)
+        => CreateGoneResponse(new ResponseBody(message));
+
     public static HttpResponseException InternalServerError(string? message = null)
         => CreateInternalServerErrorResponse(new ResponseBody(message));
 
@@ -60,6 +63,9 @@ public class HttpResponseFactoryBase
 
     private static HttpResponseException CreateConflictResponse(ResponseBody? value = null)
         => new(HttpStatusCode.Conflict, value);
+
+    private static HttpResponseException CreateGoneResponse(ResponseBody? value = null)
+        => new(HttpStatusCode.Gone, value);
 
     public static HttpResponseException CreateInternalServerErrorResponse(ResponseBody? value = null)
         => new(HttpStatusCode.InternalServerError, value);
