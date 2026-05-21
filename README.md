@@ -93,7 +93,7 @@ dotnet new update
 An ASP.NET Core API service with Umea.se.Toolkit integration and xUnit tests. Supports full layered architecture or minimal setup, cloud or on-premises deployment, and optional EF Core database integration.
 
 ```bash
-dotnet new ume-template-api -n MyNewService
+dotnet new ume-template-api -n MyNewService -o ume-app-mynewservice
 ```
 
 All occurrences of `TemplateService` in file/folder names, namespaces, and content are replaced with the name you provide.
