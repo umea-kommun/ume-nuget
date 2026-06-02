@@ -1,6 +1,7 @@
 ﻿using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.KeyVault;
 
@@ -21,6 +22,9 @@ internal static class HttpClientAdder
         X509Certificate2? clientCertificate = options.CertificateName is not null && KeyVaultService.IsConnected
             ? KeyVaultService.GetCertificate(options.CertificateName)
             : null;
+
+        services.AddHttpContextAccessor();
+        services.TryAddTransient<UserContextForwardingHandler>();
 
         services
             .AddHttpClient(clientName)
@@ -63,7 +67,8 @@ internal static class HttpClientAdder
                 }
 
                 return handler;
-            });
+            })
+            .AddHttpMessageHandler<UserContextForwardingHandler>();
 
         return services;
     }

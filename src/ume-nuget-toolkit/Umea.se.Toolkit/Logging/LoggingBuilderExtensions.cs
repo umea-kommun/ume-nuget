@@ -1,9 +1,11 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Umea.se.Toolkit.Configuration;
 using Umea.se.Toolkit.Logging.ConsoleLogger;
@@ -41,6 +43,8 @@ internal static class LoggingBuilderExtensions
 
         internal ILoggingBuilder AddApplicationInsightsLogger(ApplicationConfigCloudBase config)
         {
+            builder.Services.AddHttpContextAccessor();
+
             builder.Services
                 .AddOpenTelemetry()
                 .UseAzureMonitor(options =>
@@ -63,12 +67,22 @@ internal static class LoggingBuilderExtensions
                                 activity.SetTag("User-Agent", userAgent.ToString());
                             }
 
-                            if (httpRequest.Headers.TryGetValue("X-AuthenticatedUserId", out StringValues authenticatedUserId))
+                            if (httpRequest.Headers.TryGetValue(UserContextHeaderNames.UserId, out StringValues userId))
                             {
-                                activity.SetTag("enduser.id", authenticatedUserId.ToString());
+                                activity.SetTag("enduser.pseudo.id", userId.ToString());
+                            }
+
+                            if (httpRequest.Headers.TryGetValue(UserContextHeaderNames.SessionId, out StringValues sessionId))
+                            {
+                                activity.SetTag("microsoft.session.id", sessionId.ToString());
                             }
                         };
                     });
+                })
+                .WithLogging(logging =>
+                {
+                    logging.AddProcessor(sp =>
+                        new UserContextLogRecordProcessor(sp.GetRequiredService<IHttpContextAccessor>()));
                 });
 
             return builder;
