@@ -28,10 +28,18 @@ internal static class KeyVaultService
     {
         string base64Pfx = GetSecret(certificateName);
         byte[] pfxBytes = Convert.FromBase64String(base64Pfx);
+
+        // On Azure App Service (Windows) the sandbox blocks the machine key store,
+        // so MachineKeySet leaves the private key inaccessible and Schannel fails
+        // when it re-acquires the client credential mid-process with
+        // SEC_E_UNKNOWN_CREDENTIALS (0x8009030D). Use the user key store instead,
+        // which the platform exposes when WEBSITE_LOAD_USER_PROFILE=1 is set, and
+        // PersistKeySet so the key file survives for the whole process lifetime
+        // (the cert is eager-loaded once at startup, so it won't accumulate files).
         X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12(
             pfxBytes,
             string.Empty,
-            X509KeyStorageFlags.MachineKeySet);
+            X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.PersistKeySet);
 
         return certificate;
     }
