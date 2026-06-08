@@ -62,4 +62,3 @@ internal static class KeyVaultService
         return new DefaultAzureCredential(credentialOptions);
     }
 }
-

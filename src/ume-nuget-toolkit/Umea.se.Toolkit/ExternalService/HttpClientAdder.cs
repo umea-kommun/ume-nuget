@@ -2,6 +2,7 @@
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Umea.se.Toolkit.Auth.BearerToken;
 using Umea.se.Toolkit.EntryPoints;
 using Umea.se.Toolkit.KeyVault;
 
@@ -26,7 +27,7 @@ internal static class HttpClientAdder
         services.AddHttpContextAccessor();
         services.TryAddTransient<UserContextForwardingHandler>();
 
-        services
+        IHttpClientBuilder builder = services
             .AddHttpClient(clientName)
             .ConfigureHttpClient(httpClient =>
             {
@@ -70,6 +71,20 @@ internal static class HttpClientAdder
             })
             .AddHttpMessageHandler<UserContextForwardingHandler>();
 
+        if (options.BearerToken is { } bearer)
+        {
+            AddBearerTokenHandler(builder, bearer);
+        }
+
         return services;
+    }
+
+    private static void AddBearerTokenHandler(IHttpClientBuilder builder, TokenCredentials credentials)
+    {
+        // Azure.Identity caches and refreshes internally. Capture one credential source
+        // per configured HttpClient so the cache survives HttpMessageHandler rotation.
+        ClientSecretTokenCredentialSource source = new(credentials);
+
+        builder.AddHttpMessageHandler(() => new BearerTokenHandler(source.Credential, source.Scopes));
     }
 }
