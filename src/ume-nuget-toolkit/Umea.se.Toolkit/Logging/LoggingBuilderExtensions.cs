@@ -90,6 +90,14 @@ internal static class LoggingBuilderExtensions
 
         internal ILoggingBuilder AddOnPremLogger(ApplicationConfigOnPremBase config)
         {
+            if (config.Environment is EnvironmentNames.Local.Development &&
+                string.IsNullOrWhiteSpace(config.OnPremLoggerUrl))
+            {
+                return builder;
+            }
+
+            builder.Services.AddHttpContextAccessor();
+
             builder.Services
                 .AddHttpClient(nameof(OnPremLogger.OnPremLogger), httpClient =>
                 {

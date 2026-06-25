@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Umea.se.Toolkit.Configuration;
 using Umea.se.Toolkit.Logging.OnPremLogger.Models;
@@ -13,8 +14,11 @@ public class OnPremLogger : ILogger
     private readonly string _categoryName;
     private readonly ApplicationConfigOnPremBase _config;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private HttpClient? _httpClient;
     private HttpClient HttpClient => _httpClient ??= _httpClientFactory.CreateClient(nameof(OnPremLogger));
+    private bool? _isOnPremLoggerLocal;
+    private bool IsOnPremLoggerLocal => _isOnPremLoggerLocal ??= HttpClient.BaseAddress?.IsLoopback ?? false;
     private readonly Dictionary<Type, string> _onPremLoggerEndpointMap = new()
     {
         {
@@ -31,11 +35,16 @@ public class OnPremLogger : ILogger
         },
     };
 
-    public OnPremLogger(IHttpClientFactory httpClientFactory, ApplicationConfigOnPremBase config, string categoryName)
+    public OnPremLogger(
+        IHttpClientFactory httpClientFactory,
+        IHttpContextAccessor httpContextAccessor,
+        ApplicationConfigOnPremBase config,
+        string categoryName)
     {
         _categoryName = categoryName;
         _config = config;
         _httpClientFactory = httpClientFactory;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
@@ -63,13 +72,15 @@ public class OnPremLogger : ILogger
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        if (!IsEnabled(logLevel) || _config.Environment is EnvironmentNames.Local.Development)
+        if (!IsEnabled(logLevel) || (_config.Environment is EnvironmentNames.Local.Development && !IsOnPremLoggerLocal))
         {
             return;
         }
 
         BaseLog log = GetLog(logLevel, state, exception, formatter);
-        _ = SendLogToOnPremLogger(log);
+
+        (string? userId, string? sessionId) = GetUserContext();
+        _ = SendLogToOnPremLogger(log, userId, sessionId);
     }
 
     private BaseLog GetLog<TState>(LogLevel logLevel,
@@ -117,6 +128,22 @@ public class OnPremLogger : ILogger
         };
     }
 
+    private (string? UserId, string? SessionId) GetUserContext()
+    {
+        IHeaderDictionary? headers = _httpContextAccessor.HttpContext?.Request.Headers;
+        if (headers is null)
+        {
+            return (null, null);
+        }
+
+        string? userId = headers[UserContextHeaderNames.UserId].FirstOrDefault();
+        string? sessionId = headers[UserContextHeaderNames.SessionId].FirstOrDefault();
+
+        return (
+            string.IsNullOrEmpty(userId) ? null : userId,
+            string.IsNullOrEmpty(sessionId) ? null : sessionId);
+    }
+
     private CustomEventLog GetCustomEventLog(object? state)
     {
         const string customEventPropertyName = "microsoft.custom_event.name";
@@ -148,13 +175,28 @@ public class OnPremLogger : ILogger
         };
     }
 
-    private Task SendLogToOnPremLogger(BaseLog log)
+    private Task SendLogToOnPremLogger(BaseLog log, string? userId, string? sessionId)
     {
         return Task.Run(async () =>
         {
             try
             {
-                HttpResponseMessage response = await HttpClient.PostAsJsonAsync(_onPremLoggerEndpointMap[log.GetType()], log);
+                using HttpRequestMessage request = new(HttpMethod.Post, _onPremLoggerEndpointMap[log.GetType()])
+                {
+                    Content = JsonContent.Create(log),
+                };
+
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    request.Headers.TryAddWithoutValidation(UserContextHeaderNames.UserId, userId);
+                }
+
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    request.Headers.TryAddWithoutValidation(UserContextHeaderNames.SessionId, sessionId);
+                }
+
+                HttpResponseMessage response = await HttpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception e)

@@ -4,7 +4,7 @@ using OpenTelemetry.Logs;
 
 namespace Umea.se.Toolkit.Logging;
 
-internal sealed class UserContextLogRecordProcessor(IHttpContextAccessor httpContextAccessor) : BaseProcessor<LogRecord>
+public sealed class UserContextLogRecordProcessor(IHttpContextAccessor httpContextAccessor) : BaseProcessor<LogRecord>
 {
     public override void OnEnd(LogRecord data)
     {
