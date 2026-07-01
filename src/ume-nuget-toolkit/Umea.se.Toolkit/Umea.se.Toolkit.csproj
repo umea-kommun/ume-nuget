@@ -16,8 +16,12 @@
   
 	<ItemGroup>
 	  <PackageReference Include="Azure.Identity" Version="1.21.0" />
-	  <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
-	  <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.8.2" />
+	  <!-- Hard-pinned to 1.4.0/1.7.0 with [] (exact) notation: Azure.Monitor.OpenTelemetry.AspNetCore
+	       1.5.0 starts a LiveMetrics foreground thread that never terminates, hanging `dotnet test`
+	       after tests pass. Exact pin stops 1.5.0 floating back in transitively.
+	       See https://github.com/Azure/azure-sdk-for-net/issues/58948 — unpin once fixed upstream. -->
+	  <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="[1.4.0]" />
+	  <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="[1.7.0]" />
 	  <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.11.0" />
 	  <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.52.0" />
 	  <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" Version="4.6.0" />
