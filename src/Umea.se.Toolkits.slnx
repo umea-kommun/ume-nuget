@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="../.editorconfig" />
+  </Folder>
+  <Project Path="ume-nuget-testtoolkit/Umea.se.TestToolkit/Umea.se.TestToolkit.csproj" />
+  <Project Path="ume-nuget-toolkit/Umea.se.Toolkit.Test/Umea.se.Toolkit.Test.csproj" />
+  <Project Path="ume-nuget-toolkit/Umea.se.Toolkit/Umea.se.Toolkit.csproj" />
+</Solution>

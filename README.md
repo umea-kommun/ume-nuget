@@ -21,6 +21,7 @@ The repository uses **Azure DevOps Pipelines** with three pipeline definitions:
 - **Trigger:** PR build validation on `main`
 - **Purpose:** Builds and tests changed packages to gate merges
 - Detects which packages changed and only builds those
+- Toolkit and TestToolkit are one unit: a change to either folder builds both
 - Toolkit and TestToolkit: runs restore, build, and tests
 - Templates: runs the validation script that tests all parameter combinations
 
@@ -34,6 +35,7 @@ The repository uses **Azure DevOps Pipelines** with three pipeline definitions:
 
 - **Trigger:** Called by the release orchestrator, or manually for pre-releases
 - **Stages:** Validate → Check changes → Pack → Publish (per package)
+- Toolkit and TestToolkit always release together with the same version, computed once in a shared stage. TestToolkit references Toolkit as a project, so `Umea.se.TestToolkit X` depends on `Umea.se.Toolkit >= X`, and TestToolkit is only published after Toolkit is on the feed
 - Generates a date-based version, runs tests, packs `.nupkg`, and pushes to:
   - **Azure Artifacts** (`turkos.umea.se`) — all releases
   - [NuGet.org](https://www.nuget.org/profiles/umeakommun) — stable releases only
@@ -48,7 +50,7 @@ Package versions follow a **date-based** scheme:
 | **Pre-release** | `YYYY.M.D.<baseline-count>-dev.<branch-hash>.<delta>` | `2026.3.9.147-dev.a1b2c3d4.3` |
 
 - The date component uses **Stockholm local time**
-- The commit count is scoped to the package path for independent versioning
+- The commit count is scoped to the package path for independent versioning. Toolkit and TestToolkit share one count over both folders (`src/ume-nuget-*toolkit`), Templates has its own
 - `baseline-count` is the `main` commit count at the branch's last sync point, indicating which stable release the pre-release builds on
 - `delta` is the number of commits on the branch ahead of `main`
 - `branch-hash` is a truncated SHA-256 of the branch name for uniqueness

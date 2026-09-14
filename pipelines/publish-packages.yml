@@ -10,16 +10,11 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v260518T0957-17963
+      ref: refs/tags/release/v260914T1044-19408
 
 parameters:
-  - name: publishToolkit
-    displayName: Publish ume-nuget-toolkit
-    type: boolean
-    default: false
-
-  - name: publishTestToolkit
-    displayName: Publish ume-nuget-testtoolkit
+  - name: publishToolkits
+    displayName: Publish ume-nuget-toolkit and ume-nuget-testtoolkit
     type: boolean
     default: false
 
@@ -76,9 +71,9 @@ stages:
             - src/ume-nuget-testtoolkit
             - src/ume-nuget-templates
 
-  # ume-nuget-toolkit
-  - stage: PackToolkitStage
-    displayName: Pack Toolkit
+  # ume-nuget-toolkit + ume-nuget-testtoolkit
+  - stage: GenerateToolkitsVersionStage
+    displayName: Generate Toolkits version
     dependsOn:
       - CheckForChangesStage
     variables:
@@ -87,9 +82,12 @@ stages:
       and(
         not(or(failed(), canceled())),
         or(
-          eq(${{ parameters.publishToolkit }}, true),
+          eq(${{ parameters.publishToolkits }}, true),
           and(
-            contains(variables['changedPaths'], 'ume-nuget-toolkit'),
+            or(
+              contains(variables['changedPaths'], 'ume-nuget-toolkit'),
+              contains(variables['changedPaths'], 'ume-nuget-testtoolkit')
+            ),
             or(
               eq(variables['Build.Reason'], 'IndividualCI'),
               eq(variables['isAutomatedDeployment'], true)
@@ -98,14 +96,35 @@ stages:
         )
       )
     jobs:
+      - job: GeneratePackageVersionJob
+        displayName: Generate package version
+        steps:
+          - template: pipelines/nuget/template-generate-package-version.yml@templates
+            parameters:
+              templateRepoAlias: templates
+              packagePath: ":(glob)src/ume-nuget-*toolkit/**"
+              packageName: Toolkits
+              isStableRelease: ${{ variables.isStableRelease }}
+              shouldPublish: false
+
+  # ume-nuget-toolkit
+  - stage: PackToolkitStage
+    displayName: Pack Toolkit
+    dependsOn:
+      - GenerateToolkitsVersionStage
+    variables:
+      toolkitsVersion: $[ stageDependencies.GenerateToolkitsVersionStage.GeneratePackageVersionJob.outputs['Task.TOOLKITS_PACKAGE_VERSION'] ]
+    condition: eq(dependencies.GenerateToolkitsVersionStage.result, 'Succeeded')
+    jobs:
       - template: pipelines/nuget/template-pack-nuget.yml@templates
         parameters:
           templateRepoAlias: templates
-          packagePath: src/ume-nuget-toolkit
+          packagePath: ":(glob)src/ume-nuget-*toolkit/**"
           packageName: Toolkit
           projectFolderName: ume-nuget-toolkit
           entrypointProjectName: Umea.se.Toolkit
           isStableRelease: ${{ variables.isStableRelease }}
+          packageVersion: $(toolkitsVersion)
 
   - stage: PublishToolkitStage
     displayName: Publish Toolkit
@@ -129,41 +148,35 @@ stages:
   - stage: PackTestToolkitStage
     displayName: Pack TestToolkit
     dependsOn:
-      - CheckForChangesStage
+      - GenerateToolkitsVersionStage
     variables:
-      changedPaths: $[ dependencies.CheckForChangesStage.outputs['Job.Task.CHANGED_PATHS'] ]
-    condition: >-
-      and(
-        not(or(failed(), canceled())),
-        or(
-          eq(${{ parameters.publishTestToolkit }}, true),
-          and(
-            contains(variables['changedPaths'], 'ume-nuget-testtoolkit'),
-            or(
-              eq(variables['Build.Reason'], 'IndividualCI'),
-              eq(variables['isAutomatedDeployment'], true)
-            )
-          )
-        )
-      )
+      toolkitsVersion: $[ stageDependencies.GenerateToolkitsVersionStage.GeneratePackageVersionJob.outputs['Task.TOOLKITS_PACKAGE_VERSION'] ]
+    condition: eq(dependencies.GenerateToolkitsVersionStage.result, 'Succeeded')
     jobs:
       - template: pipelines/nuget/template-pack-nuget.yml@templates
         parameters:
           templateRepoAlias: templates
-          packagePath: src/ume-nuget-testtoolkit
+          packagePath: ":(glob)src/ume-nuget-*toolkit/**"
           packageName: TestToolkit
           projectFolderName: ume-nuget-testtoolkit
           entrypointProjectName: Umea.se.TestToolkit
           isStableRelease: ${{ variables.isStableRelease }}
+          packageVersion: $(toolkitsVersion)
           shouldTest: false
 
+  # TestToolkit X depends on Toolkit >= X, so it is only published after Toolkit is on the feed.
   - stage: PublishTestToolkitStage
     displayName: Publish TestToolkit
     dependsOn:
       - PackTestToolkitStage
+      - PublishToolkitStage
     variables:
       packageVersionTag: $[ stageDependencies.PackTestToolkitStage.GeneratePackageVersionJob.outputs['Task.TESTTOOLKIT_PACKAGE_VERSION_TAG'] ]
-    condition: eq(dependencies.PackTestToolkitStage.result, 'Succeeded')
+    condition: >-
+      and(
+        eq(dependencies.PackTestToolkitStage.result, 'Succeeded'),
+        eq(dependencies.PublishToolkitStage.result, 'Succeeded')
+      )
     jobs:
       - template: pipelines/nuget/template-publish-nuget.yml@templates
         parameters:

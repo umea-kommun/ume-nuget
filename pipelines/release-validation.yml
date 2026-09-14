@@ -12,7 +12,7 @@ resources:
     - repository: templates
       type: git
       name: Turkos/ume-pipeline-templates
-      ref: refs/tags/release/v260518T0957-17963
+      ref: refs/tags/release/v260914T1044-19408
 
 parameters:
   - name: environment
@@ -49,13 +49,16 @@ stages:
     condition: >-
       and(
         not(or(failed(), canceled())),
-        contains(variables['changedPaths'], 'ume-nuget-toolkit')
+        or(
+          contains(variables['changedPaths'], 'ume-nuget-toolkit'),
+          contains(variables['changedPaths'], 'ume-nuget-testtoolkit')
+        )
       )
     jobs:
       - template: pipelines/nuget/template-pack-nuget.yml@templates
         parameters:
           templateRepoAlias: templates
-          packagePath: src/ume-nuget-toolkit
+          packagePath: ":(glob)src/ume-nuget-*toolkit/**"
           packageName: Toolkit
           projectFolderName: ume-nuget-toolkit
           entrypointProjectName: Umea.se.Toolkit
@@ -72,13 +75,16 @@ stages:
     condition: >-
       and(
         not(or(failed(), canceled())),
-        contains(variables['changedPaths'], 'ume-nuget-testtoolkit')
+        or(
+          contains(variables['changedPaths'], 'ume-nuget-toolkit'),
+          contains(variables['changedPaths'], 'ume-nuget-testtoolkit')
+        )
       )
     jobs:
       - template: pipelines/nuget/template-pack-nuget.yml@templates
         parameters:
           templateRepoAlias: templates
-          packagePath: src/ume-nuget-testtoolkit
+          packagePath: ":(glob)src/ume-nuget-*toolkit/**"
           packageName: TestToolkit
           projectFolderName: ume-nuget-testtoolkit
           entrypointProjectName: Umea.se.TestToolkit
