@@ -1,6 +1,7 @@
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Umea.se.Toolkit.HealthChecks;
@@ -36,12 +37,13 @@ public static class HealthCheckSetup
     /// <summary>
     /// Maps the three standard health check endpoints:
     /// <list type="bullet">
-    ///   <item><c>/api/v1.0/health</c> — full JSON report for dashboards and operators.</item>
-    ///   <item><c>/api/v1.0/health/ready</c> — all checks must pass before traffic is routed here.</item>
+    ///   <item><c>/api/v1.0/health</c> — full JSON report for dashboards and operators; thresholds apply.</item>
+    ///   <item><c>/api/v1.0/health/ready</c> — all checks must pass before traffic is routed here; thresholds do not apply.</item>
     ///   <item><c>/api/v1.0/health/live</c> — liveness probe; confirms the process is alive with no dependency calls.</item>
     /// </list>
     /// <para>
-    /// The overall status is derived from the individual check results using the following priority order:
+    /// On <c>/api/v1.0/health</c> the overall status is derived from the individual check
+    /// results using the following priority order:
     /// <list type="number">
     ///   <item>If any check listed in <see cref="HealthCheckSetupOptions.CriticalChecks"/> is <see cref="HealthStatus.Unhealthy"/>, the overall status is immediately <see cref="HealthStatus.Unhealthy"/>.</item>
     ///   <item>If the number of unhealthy checks meets or exceeds <see cref="HealthCheckSetupOptions.UnhealthyThreshold"/>, the overall status is <see cref="HealthStatus.Unhealthy"/>.</item>
@@ -80,13 +82,25 @@ public static class HealthCheckSetup
                     _ => HealthStatus.Healthy
                 };
 
+                // Middleware set the code from raw report.Status; re-assign so the wire
+                // agrees with the threshold-adjusted body. Must precede the body write.
+                context.Response.StatusCode = overallStatus == HealthStatus.Unhealthy
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status200OK;
+
                 HealthReport adjustedReport = new(report.Entries, overallStatus, report.TotalDuration);
                 return UIResponseWriter.WriteHealthCheckUIResponse(context, adjustedReport);
             }
         };
 
         app.MapHealthChecks("/api/v1.0/health", healthCheckOptions);
-        app.MapHealthChecks("/api/v1.0/health/ready", healthCheckOptions);
+
+        // Readiness answers "should this instance take traffic", so it reports the raw
+        // report status — any unhealthy check means not ready, thresholds notwithstanding.
+        app.MapHealthChecks("/api/v1.0/health/ready", new HealthCheckOptions
+        {
+            ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+        });
         app.MapHealthChecks("/api/v1.0/health/live", new HealthCheckOptions
         {
             Predicate = _ => false,

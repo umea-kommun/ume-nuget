@@ -16,6 +16,15 @@ public abstract class DownstreamServiceHealthCheck<T>(
     ILogger<T> logger) : CachedRetryHealthCheck<T>
     where T : DownstreamServiceHealthCheck<T>
 {
+    /// <summary>
+    /// How long the health-endpoint probe stays suppressed after a downstream answers 404/401.
+    /// </summary>
+    private static readonly TimeSpan HealthProbeRecheckInterval = TimeSpan.FromHours(1);
+
+    // Monotonic deadline for retrying the probe. Racing readers cost at most one
+    // extra probe, so a plain atomic long is enough — no lock needed.
+    private static long _probeSuppressedUntil;
+
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<T> _logger = logger;
 
@@ -35,21 +44,23 @@ public abstract class DownstreamServiceHealthCheck<T>(
         string healthUrl = BuildHealthUrl(client.BaseAddress);
         string pingUrl = BuildFullUrl(client.BaseAddress, PingFallbackUrl);
 
+        // Skip the probe round trip for downstreams already known to lack /health.
+        // Suppression state is static per closed generic type, so per downstream.
+        if (Volatile.Read(ref _probeSuppressedUntil) > Environment.TickCount64)
+        {
+            return await PingAsync(client, pingUrl, cancellationToken);
+        }
+
         HttpResponseMessage response = await client.GetAsync(healthUrl, cancellationToken);
 
         // Fall back to legacy ping if the health endpoint is not yet deployed or requires auth
         if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
         {
-            response = await client.GetAsync(pingUrl, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException(
-                    $"{HttpClientName} returned HTTP {(int)response.StatusCode}",
-                    null,
-                    response.StatusCode);
-            }
+            Volatile.Write(
+                ref _probeSuppressedUntil,
+                Environment.TickCount64 + (long)HealthProbeRecheckInterval.TotalMilliseconds);
 
-            return HealthCheckResult.Healthy($"{HttpClientName} ping responded successfully.");
+            return await PingAsync(client, pingUrl, cancellationToken);
         }
 
         string body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -69,6 +80,20 @@ public abstract class DownstreamServiceHealthCheck<T>(
                 response.StatusCode),
             _ => HealthCheckResult.Healthy($"{HttpClientName} responded successfully.")
         };
+    }
+
+    private async Task<HealthCheckResult> PingAsync(HttpClient client, string pingUrl, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response = await client.GetAsync(pingUrl, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"{HttpClientName} returned HTTP {(int)response.StatusCode}",
+                null,
+                response.StatusCode);
+        }
+
+        return HealthCheckResult.Healthy($"{HttpClientName} ping responded successfully.");
     }
 
     /// <summary>

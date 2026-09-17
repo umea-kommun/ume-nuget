@@ -83,6 +83,7 @@ public sealed class HealthCheckSetupTests
             b.AddCheck("check2", () => HealthCheckResult.Healthy());
         });
 
+        statusCode.ShouldBe(HttpStatusCode.OK);
         ParseStatus(body).ShouldBe("Degraded");
     }
 
@@ -96,6 +97,7 @@ public sealed class HealthCheckSetupTests
             b.AddCheck("check3", () => HealthCheckResult.Healthy());
         });
 
+        statusCode.ShouldBe(HttpStatusCode.OK);
         ParseStatus(body).ShouldBe("Degraded");
     }
 
@@ -109,6 +111,7 @@ public sealed class HealthCheckSetupTests
             b.AddCheck("check3", () => HealthCheckResult.Unhealthy());
         });
 
+        statusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         ParseStatus(body).ShouldBe("Unhealthy");
     }
 
@@ -123,6 +126,7 @@ public sealed class HealthCheckSetupTests
             b.AddCheck("check4", () => HealthCheckResult.Unhealthy());
         });
 
+        statusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         ParseStatus(body).ShouldBe("Unhealthy");
     }
 
@@ -133,6 +137,7 @@ public sealed class HealthCheckSetupTests
             b => b.AddCheck("check1", () => HealthCheckResult.Unhealthy()),
             configureOptions: o => o.UnhealthyThreshold = 1);
 
+        statusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         ParseStatus(body).ShouldBe("Unhealthy");
     }
 
@@ -146,6 +151,7 @@ public sealed class HealthCheckSetupTests
         },
         configureOptions: o => o.UnhealthyThreshold = 2);
 
+        statusCode.ShouldBe(HttpStatusCode.OK);
         ParseStatus(body).ShouldBe("Degraded");
     }
 
@@ -182,7 +188,36 @@ public sealed class HealthCheckSetupTests
         },
         path: ReadyPath);
 
+        statusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         ParseStatus(body).ShouldBe("Unhealthy");
+    }
+
+    [Fact]
+    public async Task Ready_OneUnhealthy_IgnoresThreshold_ReturnsUnhealthy()
+    {
+        (HttpStatusCode statusCode, string? body) = await GetAsync(b =>
+        {
+            b.AddCheck("check1", () => HealthCheckResult.Unhealthy());
+            b.AddCheck("check2", () => HealthCheckResult.Healthy());
+        },
+        path: ReadyPath);
+
+        statusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        ParseStatus(body).ShouldBe("Unhealthy");
+    }
+
+    [Fact]
+    public async Task Ready_OneDegraded_ReturnsDegraded()
+    {
+        (HttpStatusCode statusCode, string? body) = await GetAsync(b =>
+        {
+            b.AddCheck("check1", () => HealthCheckResult.Degraded());
+            b.AddCheck("check2", () => HealthCheckResult.Healthy());
+        },
+        path: ReadyPath);
+
+        statusCode.ShouldBe(HttpStatusCode.OK);
+        ParseStatus(body).ShouldBe("Degraded");
     }
 
     // ── /health/live endpoint ─────────────────────────────────────────────────
