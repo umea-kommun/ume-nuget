@@ -24,7 +24,7 @@ public abstract partial class ApplicationConfigBase
     public string ApiVersion => GetValue("Api:Version");
     public Dictionary<string, string> ApiKeys => GetApiKeys();
 
-    public string[] AllowedOrigins => GetArray("Cors:AllowedOrigins");
+    public string[] AllowedOrigins => GetOverridingArray("Cors:AllowedOrigins");
 
     public LogLevel LogLevel => TryGetEnum<LogLevel>("Logging:LogLevel:Umea") ?? GetEnum<LogLevel>("Logging:LogLevel:Default");
 }
@@ -58,6 +58,38 @@ public abstract partial class ApplicationConfigBase
             .GetChildren()
             .Where(c => c.Value != null)
             .Select(c => c.Value!)];
+    }
+
+    /// <summary>
+    /// Like <see cref="GetArray(string)"/>, but the array is taken whole from the last configuration source that defines it
+    /// (e.g. appsettings.{env}.json over appsettings.json) instead of being merged per index across sources.
+    /// An empty array (<c>[]</c>) in a later source clears the array.
+    /// </summary>
+    protected string[] GetOverridingArray(string key)
+    {
+        if (Configuration is not IConfigurationRoot root)
+        {
+            return GetArray(key);
+        }
+
+        foreach (IConfigurationProvider provider in root.Providers.Reverse())
+        {
+            string[] childKeys = [.. provider.GetChildKeys([], key)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(ConfigurationKeyComparer.Instance)];
+
+            bool definesEmptyArray = provider.TryGet(key, out string? value) && string.IsNullOrEmpty(value);
+            if (childKeys.Length == 0 && !definesEmptyArray)
+            {
+                continue;
+            }
+
+            return [.. childKeys
+                .Select(childKey => provider.TryGet(ConfigurationPath.Combine(key, childKey), out string? childValue) ? childValue : null)
+                .OfType<string>()];
+        }
+
+        return [];
     }
 
     protected T[] GetArray<T>(string key) where T : class, new()

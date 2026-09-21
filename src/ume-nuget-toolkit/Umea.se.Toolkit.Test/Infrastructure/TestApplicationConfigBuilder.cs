@@ -1,4 +1,5 @@
-using System.Reflection;
+﻿using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 
 namespace Umea.se.Toolkit.Test.Infrastructure;
@@ -24,6 +25,13 @@ public static class TestApplicationConfigBuilder
         [
             new KeyValuePair<string, string?>(key, value),
         ]);
+
+        return builder;
+    }
+
+    public static ConfigurationBuilder WithJson(this ConfigurationBuilder builder, string json)
+    {
+        builder.AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes(json)));
 
         return builder;
     }
